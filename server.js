@@ -1,60 +1,36 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+import { pool } from './src/db.js';
+import healthRouter from './src/routes/health.js';
+import authRouter from './src/routes/auth.js';
+import genericRouter from './src/routes/generic.js';
+import matchesExtraRouter from './src/routes/matches_extra.js';
 
-const { pool } = require('./src/config/db');
-const authRoutes = require('./src/routes/auth.routes');
-const userRoutes = require('./src/routes/users.routes');
-const clubRoutes = require('./src/routes/clubs.routes');
-const matchRoutes = require('./src/routes/matches.routes');
+dotenv.config();
 
 const app = express();
-
-app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 
-// Welcome
-app.get('/', (req, res) => res.send('✅ PlayMatch API running'));
+app.get('/', (req, res) => res.json({ name: 'PlayMatch Backend', version: '1.0.0' }));
 
-// Health endpoints
-// --- COMPROBACIÓN GENERAL DEL SERVIDOR ---
-app.get('/api/health', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT 1 AS ok');
-    res.json({ status: 'ok', db: rows[0].ok === 1 });
-  } catch (err) {
-    res.status(500).json({ status: 'error', error: err.message });
-  }
-});
+app.use('/api/health', healthRouter);
+app.use('/api/auth', authRouter);
 
-// --- OPCIONAL: Comprobación específica de la base de datos ---
-app.get('/api/health/db', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT 1 AS ok');
-    res.json({ db: rows[0].ok === 1 ? 'up' : 'down' });
-  } catch (e) {
-    res.status(500).json({ db: 'down', error: e.message });
-  }
-});
+// Generic CRUD (protected)
+app.use('/api', genericRouter);
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/clubs', clubRoutes);
-app.use('/api/matches', matchRoutes);
+// Extra endpoints
+app.use('/api/matches', matchesExtraRouter);
 
 // 404
 app.use((req, res) => res.status(404).json({ message: 'Not found' }));
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server error' });
+// Start
+const port = Number(process.env.PORT || 3000);
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Server listening on :${PORT}`));

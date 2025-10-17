@@ -1,55 +1,86 @@
-# PlayMatch Backend (Express + MySQL)
+# PlayMatch Backend (Express + MySQL + JWT)
 
-Backend listo para desplegar en **Render**, conectado a **MySQL en CDmon**.
+Backend listo para Render con CRUD genérico para **todas** las tablas del esquema PlayMatch y autenticación JWT.
 
-## 1) Requisitos
-- Node.js 18+
-- Credenciales de MySQL (CDmon): host, puerto (3306), usuario, contraseña, base de datos.
-  - Asegúrate de que tu usuario MySQL permite **accesos remotos** y que el firewall de CDmon lo permite.
+## 🚀 Quick start
 
-## 2) Configuración local (opcional)
 ```bash
-cp .env.example .env
-# Rellena las variables con tus datos de CDmon
 npm install
-npm run dev
+cp .env.example .env  # o edita .env con tus valores (ya viene preparado)
+npm start
 ```
-- `GET http://localhost:10000/` → "PlayMatch API running"
-- `GET http://localhost:10000/health/db` → {"db":"up"} si la DB conecta.
 
-## 3) Endpoints
-- `POST /api/auth/register` { email, password, full_name, username? }
-- `POST /api/auth/login` { email, password } → { token, user }
-- (Protegidos por JWT: añadir header `Authorization: Bearer <token>`)
-  - `GET /api/users`
-  - `GET /api/clubs`
-  - `POST /api/clubs` { name, city?, country?, status? }
-  - `GET /api/matches`
-  - `POST /api/matches` { club_id, court_id, date(YYYY-MM-DD), time_slot, status? }
+El servidor expone `http://localhost:3000`.
 
-## 4) Despliegue en Render (paso a paso)
-1. Sube esta carpeta a un repo GitHub, por ejemplo `playmatch-backend`.
-2. En Render: **New → Web Service** → conecta el repo.
-3. Configura:
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Environment**: Node
-4. En **Environment Variables**, crea estas claves con tus valores de CDmon:
-   - `PORT` = 10000 (opcional)
-   - `DB_HOST` = host de MySQL en CDmon
-   - `DB_PORT` = 3306
-   - `DB_USER` = usuario
-   - `DB_PASSWORD` = contraseña
-   - `DB_NAME` = nombre de la base de datos (playmatch)
-   - `JWT_SECRET` = una cadena aleatoria larga
-5. Haz Deploy. Prueba:
-   - `GET https://tu-backend.onrender.com/`
-   - `GET https://tu-backend.onrender.com/health/db`
+## 🔑 Autenticación
 
-## 5) Conectar el Frontend
-- Configura una variable (por ejemplo `VITE_API_URL`) en tu frontend con la URL de este backend.
-- En cada petición, si el endpoint está protegido, añade `Authorization: Bearer <token>`.
+- `POST /api/auth/login` — body: `{ "email": "...", "password": "..." }` o `{ "username": "...", "password": "..." }`
+- Respuesta: `{ token, user }`
+- Usa el token en `Authorization: Bearer <token>` para las rutas protegidas.
 
-## 6) Esquema de la BBDD
-- El backend asume el esquema de `playmatch_schema_mysql.sql` tal como lo tienes.
-- Importa tu SQL en CDmon antes de usar los endpoints.
+> **Nota:** si no hay usuarios con `password_hash`, crea uno con `/api/auth/register` (opcional) o inserta en BD con bcrypt.
+
+## 🧰 Endpoints de salud
+- `GET /api/health` → `{ status: "ok" }`
+- `GET /api/health/db` → `{ db: "up" | "down" }`
+
+## 📦 CRUD genérico (todas las tablas)
+
+- Listar: `GET /api/<table>?limit=50&offset=0&orderBy=id DESC`
+- Obtener por ID (PK simple): `GET /api/<table>/<id>`
+- Crear: `POST /api/<table>` body = objeto con columnas válidas
+- Actualizar:
+  - PK simple: `PUT /api/<table>/<id>` body = columnas a actualizar
+  - PK compuesta: `PUT /api/<table>` body = `{ pk: { col1, col2, ... }, ...campos }`
+- Borrar:
+  - PK simple: `DELETE /api/<table>/<id>`
+  - PK compuesta: `DELETE /api/<table>` body = `{ pk: { col1, col2, ... } }`
+
+Tablas permitidas (whitelist): `clubs, game_types, modalities, levels, user_role_tags, users, user_groups, user_group_members, user_passes, courts, court_game_types, court_blocks, court_block_slots, matches, match_players, bookings, chats, chat_participants, messages, bar_tables, bar_orders, bar_order_items, cash_drawer_sessions, access_logs, internal_messages, internal_message_readers, themes`.
+
+## 🏷️ Endpoints extra (matches)
+
+- `GET /api/matches/detailed` — lista partidos con joins de club, court, game_type, level, modality
+- `GET /api/matches/:matchId/players` — jugadores de un partido
+
+## 🔒 Roles
+
+El middleware incluye `requireRole([...])` si deseas restringir por rol (`superadmin`, `admin`, etc.). Actualmente, el CRUD genérico solo requiere estar autenticado.
+
+## ⚙️ Variables de entorno
+
+```
+DB_HOST=...
+DB_USER=...
+DB_PASSWORD=...
+DB_NAME=playmatch
+DB_PORT=3306
+JWT_SECRET=...
+PORT=3000
+```
+
+> `.env` está en `.gitignore`. En Render, configúralas en **Environment**.
+
+## 📁 Estructura
+
+```
+src/
+  db.js
+  middleware/auth.js
+  routes/
+    auth.js
+    health.js
+    generic.js
+    matches_extra.js
+server.js
+```
+
+## ☁️ Deploy en Render
+
+1. Sube este proyecto a GitHub.
+2. En Render → **New Web Service** → Link al repo.
+3. Runtime: Node, `Build Command: npm install`, `Start Command: npm start`.
+4. Añade las variables de entorno anteriores.
+5. Listo.
+```
+
