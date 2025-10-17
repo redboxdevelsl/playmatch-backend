@@ -21,7 +21,7 @@ app.use(morgan('dev'));
 app.get('/', (req, res) => res.send('✅ PlayMatch API running'));
 
 // Health endpoints
-// Healthcheck que prueba conexión a la base de datos
+// --- COMPROBACIÓN GENERAL DEL SERVIDOR ---
 app.get('/api/health', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 AS ok');
@@ -31,7 +31,8 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-app.get('/health/db', async (req, res) => {
+// --- OPCIONAL: Comprobación específica de la base de datos ---
+app.get('/api/health/db', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 AS ok');
     res.json({ db: rows[0].ok === 1 ? 'up' : 'down' });
